@@ -3,10 +3,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from cosserat_model.plot import plot_observation_2d
+from pyel_model.plot import plot_observation_2d
 
 
-dataset_folder = "dataset_20250718_171730"
+dataset_folder = "dataset_20250901_131816"
 
 files = os.listdir(dataset_folder)
 files = [f for f in files if f.endswith(".pkl")]

@@ -1,18 +1,19 @@
 import time
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, Manager, Value
 from pyel_model.dlo_model import DloModel, DloModelParams
 import numpy as np
 import datetime
 import os
 import pickle
+from tqdm import tqdm
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-ITERS = 100        # total number of simulations
+ITERS = 120
 MAX_DISP = 0.075
 MAX_ROT = np.pi / 4
-RESET_EVERY = 20
+RESET_EVERY = 5
 SAVE_PATH = f"dataset_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}/"
 
 CONFIG = {
@@ -43,27 +44,33 @@ dlo_params = DloModelParams(
 os.makedirs(SAVE_PATH, exist_ok=True)
 print(f"Saving data to {SAVE_PATH}")
 
+# -----------------------------
+# SOLUTION 2: SHARED COUNTER
+# -----------------------------
 
-# -----------------------------
-# WORKER FUNCTION
-# -----------------------------
-def run_block(start_idx):
-    """
-    Run a block of simulations sequentially.
-    Keeps the reset/continuation logic intact within the block.
-    """
+def init_worker():
+    """Initialize each worker with unique random seed"""
+    worker_id = os.getpid()
+    np.random.seed(worker_id + int(time.time() * 1000) % 1000000)
+
+
+def run_block_with_counter(args):
+    """Run a block of simulations with shared progress counter"""
+    start_idx, counter, lock, block_size = args
+    # No need to set seed here, it's already done in initializer
+    
     init_shape, init_directors = None, None
 
-    for i in range(start_idx, start_idx + BLOCK_SIZE):
-        if i >= ITERS:  # safety stop for last block
+    for i in range(start_idx, start_idx + block_size):
+        if i >= ITERS:
             break
 
-        # random action
+        # random action - now properly randomized per process
         action_1 = np.random.randint(0, dlo_params.n_elem - 1)
         action_2 = np.random.uniform(-MAX_DISP, MAX_DISP)
         action_3 = np.random.uniform(-MAX_DISP, MAX_DISP)
         action_4 = np.random.uniform(-MAX_ROT, MAX_ROT)
-
+        
         # build and simulate
         dlo = DloModel(dlo_params, position=init_shape, directors=init_directors)
         dlo.build_model(action=[action_1, action_2, action_3, action_4])
@@ -73,6 +80,10 @@ def run_block(start_idx):
         mod_value = i % RESET_EVERY
         save_name = str(i).zfill(5) + "_" + str(mod_value).zfill(2) + ".pkl"
         pickle.dump(dict_out, open(os.path.join(SAVE_PATH, save_name), "wb"))
+
+        # update shared counter
+        with lock:
+            counter.value += 1
 
         # update continuation/reset
         if mod_value == (RESET_EVERY - 1):
@@ -84,22 +95,53 @@ def run_block(start_idx):
     return start_idx
 
 
+def solution2_shared_counter():
+    """Solution 2: Use shared counter for real-time progress updates"""
+    print("Solution 2: Shared counter approach")
+    
+    start = time.time()
+    n_workers = cpu_count()
+    BLOCK_SIZE = int(np.ceil(ITERS / n_workers))
+    
+    with Manager() as manager:
+        counter = manager.Value('i', 0)
+        lock = manager.Lock()
+        
+        tasks = [(i, counter, lock, BLOCK_SIZE) 
+                for i in range(0, ITERS, BLOCK_SIZE)]
+        
+        # Use initializer to set unique random seeds
+        with Pool(n_workers, initializer=init_worker) as pool:
+
+            # Start the workers
+            result = pool.map_async(run_block_with_counter, tasks)
+            
+            # Monitor progress
+            with tqdm(total=ITERS, desc="Simulations") as pbar:
+                last_count = 0
+                while not result.ready():
+                    current_count = counter.value
+                    if current_count > last_count:
+                        pbar.update(current_count - last_count)
+                        last_count = current_count
+                    time.sleep(0.1)  # Check every 100ms
+                
+                # Final update
+                final_count = counter.value
+                if final_count > last_count:
+                    pbar.update(final_count - last_count)
+            
+            result.get()  # Wait for completion
+    
+    end = time.time()
+    print(f"Total runtime: {end - start:.2f} seconds")
+
+
+
 # -----------------------------
 # MAIN
 # -----------------------------
 if __name__ == "__main__":
-    start = time.time()
 
-    n_workers = cpu_count()
-    # define BLOCK_SIZE as global for run_block
-    BLOCK_SIZE = int(np.ceil(ITERS / n_workers))
-    tasks = range(0, ITERS, BLOCK_SIZE)
 
-    print(f"Using {n_workers} workers, {len(tasks)} blocks of size {BLOCK_SIZE}, total_size = {n_workers * BLOCK_SIZE}")
-
-    with Pool(n_workers) as pool:
-        for _ in pool.imap_unordered(run_block, tasks):
-            pass
-
-    end = time.time()
-    print(f"Total runtime: {end - start:.2f} seconds")
+    solution2_shared_counter()
