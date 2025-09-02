@@ -2,3 +2,9 @@
 /DATA
 /checkpoints
 /dataset*
+*.pyc
+*.nbc
+*.nbi
+*.nbl
+*.egg-info/
+__pycache__/

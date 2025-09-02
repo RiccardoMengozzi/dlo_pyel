@@ -10,10 +10,10 @@ from tqdm import tqdm
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-ITERS = 120
+ITERS = 640000
 MAX_DISP = 0.075
 MAX_ROT = np.pi / 4
-RESET_EVERY = 5
+RESET_EVERY = 20
 SAVE_PATH = f"dataset_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}/"
 
 CONFIG = {
@@ -102,6 +102,7 @@ def solution2_shared_counter():
     start = time.time()
     n_workers = cpu_count()
     BLOCK_SIZE = int(np.ceil(ITERS / n_workers))
+    print(f"Generating {ITERS} data with {n_workers} processes ({BLOCK_SIZE} data each) ")
     
     with Manager() as manager:
         counter = manager.Value('i', 0)
