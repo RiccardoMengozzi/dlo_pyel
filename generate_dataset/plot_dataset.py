@@ -1,21 +1,29 @@
-import pickle
-import os
-import numpy as np
 import matplotlib.pyplot as plt
 
 from pyel_model.plot import plot_observation_2d
 
+import os
+import zarr
+import numpy as np
 
-dataset_folder = "/home/lar/Riccardo/dlo_diffusion/dataset_20250901_132645"
+def load_all_zarr(folder_path):
+    simulations = []
+    for fname in sorted(os.listdir(folder_path)):
+        if fname.endswith(".zarr"):
+            path = os.path.join(folder_path, fname)
+            root = zarr.open_group(path, mode="r")
 
-files = os.listdir(dataset_folder)
-files = [f for f in files if f.endswith(".pkl")]
-files = sorted(files)
+            sim_data = {}
+            # carica i dataset come array numpy
+            for key in root.array_keys():
+                sim_data[key] = root[key][:]
+            # carica gli attributi
+            sim_data.update(root.attrs.asdict())
 
+            simulations.append(sim_data)
 
-for file in files:
-    print(f"Processing {file}")
+    return np.array(simulations)
 
-    data = pickle.load(open(os.path.join(dataset_folder, file), "rb"))
-
-    plot_observation_2d(data)
+data = load_all_zarr("dataset_zarr_20250902_161338")
+for d in data:
+    plot_observation_2d(d)

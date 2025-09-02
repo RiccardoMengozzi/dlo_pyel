@@ -4,13 +4,13 @@ from pyel_model.dlo_model import DloModel, DloModelParams
 import numpy as np
 import datetime
 import os
-import pickle
+import zarr
 from tqdm import tqdm
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-ITERS = 640000
+ITERS = 20
 MAX_DISP = 0.075
 MAX_ROT = np.pi / 4
 RESET_EVERY = 20
@@ -57,35 +57,47 @@ def init_worker():
 def run_block_with_counter(args):
     """Run a block of simulations with shared progress counter"""
     start_idx, counter, lock, block_size = args
-    # No need to set seed here, it's already done in initializer
-    
     init_shape, init_directors = None, None
 
     for i in range(start_idx, start_idx + block_size):
         if i >= ITERS:
             break
 
-        # random action - now properly randomized per process
+        # random action
         action_1 = np.random.randint(0, dlo_params.n_elem - 1)
         action_2 = np.random.uniform(-MAX_DISP, MAX_DISP)
         action_3 = np.random.uniform(-MAX_DISP, MAX_DISP)
         action_4 = np.random.uniform(-MAX_ROT, MAX_ROT)
-        
-        # build and simulate
+
         dlo = DloModel(dlo_params, position=init_shape, directors=init_directors)
         dlo.build_model(action=[action_1, action_2, action_3, action_4])
         dict_out = dlo.run_simulation(progress_bar=False)
 
-        # save result
+        # save result in Zarr
         mod_value = i % RESET_EVERY
-        save_name = str(i).zfill(5) + "_" + str(mod_value).zfill(2) + ".pkl"
-        pickle.dump(dict_out, open(os.path.join(SAVE_PATH, save_name), "wb"))
+        save_name = str(i).zfill(5) + "_" + str(mod_value).zfill(2) + ".zarr"
+        save_path = os.path.join(SAVE_PATH, save_name)
 
-        # update shared counter
+        root = zarr.open_group(save_path, mode="w")
+
+        for key, value in dict_out.items():
+            if isinstance(value, np.ndarray):
+                root.create_dataset(
+                    key,
+                    data=value,
+                    chunks=True,          # chunking automatico
+                    compressor=zarr.get_codec({'id': 'zlib'})  # compressione
+                )
+            elif isinstance(value, (int, float, str, np.int32, np.float32)):
+                root.attrs[key] = value
+            else:
+                root.attrs[key] = str(value)
+
+        # update counter
         with lock:
             counter.value += 1
 
-        # update continuation/reset
+        # reset or continue
         if mod_value == (RESET_EVERY - 1):
             init_shape, init_directors = None, None
         else:
@@ -95,7 +107,7 @@ def run_block_with_counter(args):
     return start_idx
 
 
-def solution2_shared_counter():
+def shared_counter():
     """Solution 2: Use shared counter for real-time progress updates"""
     print("Solution 2: Shared counter approach")
     
@@ -143,6 +155,4 @@ def solution2_shared_counter():
 # MAIN
 # -----------------------------
 if __name__ == "__main__":
-
-
-    solution2_shared_counter()
+    shared_counter()
