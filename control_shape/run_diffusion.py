@@ -296,7 +296,7 @@ class DiffusionInference:
         return dlo_0, dlo_1, act
 
 
-def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shape, num_iterations=10):
+def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shape, num_iterations=10, half_exec=True):
     """Run simulation for a single model and return all actions and shapes"""
     dlo_0 = init_shape.copy()
     dir_0 = init_dir.copy()
@@ -316,6 +316,7 @@ def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shap
         action_idx = pred_action[0, 0]
 
         list_shapes, list_directors = [], []
+        pred_action = pred_action[:int(pred_action.shape[0] // 2 + 1), :] if half_exec else pred_action
         for h in range(pred_action.shape[0]):
             dlo = DloModel(dlo_params, position=dlo_0, directors=dir_0)
             dlo.build_model(action=pred_action[h])
@@ -411,7 +412,7 @@ if __name__ == "__main__":
     dlo_diff_1 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
     
     print("Loading Model 2...")
-    dlo_diff_2 = DiffusionInference(CHECKPOINT_PATH_2, device="cuda")
+    dlo_diff_2 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
 
     ################################
 
@@ -441,27 +442,25 @@ if __name__ == "__main__":
 
     # Alternative: Load from dataset
     import glob, pickle
-    test_dataset_path = "/home/lar/Riccardo/dlo_diffusion/DATA_500k/val"
+    test_dataset_path = "DATA/train"
     data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
     print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
     data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
     init_data = pickle.load(open(data_files[0], "rb"))
-    final_data = pickle.load(open(data_files[0], "rb"))
-    #init_shape = init_data["init_shape"]
-    print("init_data", repr(init_shape))
-    #init_dir = init_data["init_directors"]
+    final_data = pickle.load(open(data_files[5], "rb"))
+    init_shape = init_data["init_shape"]
+    init_dir = init_data["init_directors"]
     target_shape = final_data["final_shape"]
-    print("init_data", repr(target_shape))
     target_dir = final_data["final_directors"]
 
     ########################################
 
     # Run simulations for both models
     print("Running simulation for Model 1...")
-    all_actions_1, all_shapes_1 = run_model_simulation(dlo_diff_1, dlo_params, init_shape, init_dir, target_shape, num_iterations=10)
+    all_actions_1, all_shapes_1 = run_model_simulation(dlo_diff_1, dlo_params, init_shape, init_dir, target_shape, num_iterations=10, half_exec=True)
     
     print("Running simulation for Model 2...")
-    all_actions_2, all_shapes_2 = run_model_simulation(dlo_diff_2, dlo_params, init_shape, init_dir, target_shape, num_iterations=10)
+    all_actions_2, all_shapes_2 = run_model_simulation(dlo_diff_2, dlo_params, init_shape, init_dir, target_shape, num_iterations=10, half_exec=False)
 
     # Prepare data for plotting
     init_shape_ok = init_shape.T
