@@ -149,6 +149,8 @@ def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shap
 
     for i in range(num_iterations):
         # run diffusion to get the predicted action
+        print(dlo_0.shape)
+        print(target_shape.shape)
         dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(dlo_0, target_shape)
 
         list_shapes, list_directors = [], []
@@ -395,16 +397,18 @@ if __name__ == "__main__":
 
     # Determine which model performs better
     if avg_errors_model1[-1] < avg_errors_model2[-1]:
-        print(f"\n✓ Model 1 performes {(avg_errors_model2[-1] / avg_errors_model1[-1] - 1)}% better on average error after {NUM_ITERATIONS} actions")
+        value = ((avg_errors_model2[-1] - avg_errors_model1[-1]) / avg_errors_model1[-1] * 100)
+        print(f"\n✓ Standard performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
     else:
-        print(f"\n✓ Model 2 performes {(avg_errors_model1[-1] / avg_errors_model2[-1] - 1)}% better on average error after {NUM_ITERATIONS} actions")
+        value = ((avg_errors_model1[-1] - avg_errors_model2[-1]) / avg_errors_model2[-1] * 100)
+        print(f"\n✓ Intermediate actions performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
 
     if max_errors_model1[-1] < max_errors_model2[-1]:
-        print(f"\n✓ Model 1 performes {(max_errors_model2[-1] / max_errors_model1[-1] - 1)}% better on max error after {NUM_ITERATIONS} actions")
+        value = ((max_errors_model2[-1] - max_errors_model1[-1]) / max_errors_model1[-1] * 100)
+        print(f"\n✓ Standard performes {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
     else:
-        print(f"\n✓ Model 1 performes {(max_errors_model1[-1] / max_errors_model2[-1] - 1)}% better on max error after {NUM_ITERATIONS} actions")
-
-
+        value = ((max_errors_model1[-1] - max_errors_model2[-1]) / max_errors_model2[-1] * 100)
+        print(f"\n✓ Intermediate actions performes {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
 
 
 
