@@ -396,17 +396,17 @@ if __name__ == "__main__":
     # Determine which model performs better
     if avg_errors_model1[-1] < avg_errors_model2[-1]:
         value = ((avg_errors_model2[-1] - avg_errors_model1[-1]) / avg_errors_model1[-1] * 100)
-        print(f"\n✓ Standard performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
+        print(f"\n✓ Model {model_name_1} performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
     else:
         value = ((avg_errors_model1[-1] - avg_errors_model2[-1]) / avg_errors_model2[-1] * 100)
-        print(f"\n✓ Intermediate actions performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
+        print(f"\n✓ Model {model_name_2} performes {value:.2f}% better on average error after {NUM_ITERATIONS} actions")
 
     if max_errors_model1[-1] < max_errors_model2[-1]:
         value = ((max_errors_model2[-1] - max_errors_model1[-1]) / max_errors_model1[-1] * 100)
-        print(f"\n✓ Standard performes {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
+        print(f"\n✓ Model {model_name_1} {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
     else:
         value = ((max_errors_model1[-1] - max_errors_model2[-1]) / max_errors_model2[-1] * 100)
-        print(f"\n✓ Intermediate actions performes {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
+        print(f"\n✓ Model {model_name_2} performes {value:.2f}% better on max error after {NUM_ITERATIONS} actions")
 
 
 
