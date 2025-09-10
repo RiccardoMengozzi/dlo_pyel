@@ -384,7 +384,7 @@ if __name__ == "__main__":
         "length": 0.5,  # length of the rod (m)
         "radius": 0.005,  # radius of the rod (m)
         "density": 1e3,  # density of the rod (kg/m^3)
-        "youngs_modulus": 1e7,  # young's modulus of the rod (Pa)
+        "youngs_modulus": 1e5,  # young's modulus of the rod (Pa)
         "action_velocity": 0.1,  # m/s (velocity of the action which influences the number of steps during simulation)
     }
 
@@ -400,11 +400,11 @@ if __name__ == "__main__":
     )
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "DATA/train")
+    DATA_PATH = os.path.join(MAIN_DIR, "dataset_20250909_123420")
     
     # Define paths for both models
     CHECKPOINT_PATH_1 = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
-    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_winter-fire-65_best.pt")  # Replace with your second model path
+    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_serene-shadow-12_best_TRAJ.pt")  # Replace with your second model path
     
     # Load both models
     print("Loading Model 1...")
@@ -422,44 +422,43 @@ if __name__ == "__main__":
     dict_out = dlo.run_simulation()
     init_shape = dict_out["final_shape"]
     init_dir = dict_out["final_directors"]
-
     # Set up target shape
     R = [[0.0, 1.0],
          [-1.0, 0.0]]
     target_shape = DLO_1_N_TEST @ R 
     target_dir, target_shape = create_directors_from_positions(target_shape)
     target_shape = target_shape.T
-
     # Move centers to be in same position
     init_shape_center = np.mean(init_shape, axis=1)
     target_shape_center = np.mean(target_shape, axis=1)
     centers_distance = target_shape_center - init_shape_center
     init_shape = (init_shape.T + centers_distance).T
-
     target_dir = np.array(target_dir)[0:-1]
     target_dir = np.moveaxis(target_dir, 0, -1)
 
     # Alternative: Load from dataset
-    import glob, pickle
-    test_dataset_path = "DATA/train"
-    data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
-    print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
-    data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
-    init_data = pickle.load(open(data_files[0], "rb"))
-    final_data = pickle.load(open(data_files[100], "rb"))
-    init_shape = init_data["init_shape"]
-    init_dir = init_data["init_directors"]
-    target_shape = final_data["final_shape"]
-    target_dir = final_data["final_directors"]
+    # import glob, pickle
+    # test_dataset_path = "DATA/val"
+    # data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
+    # print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
+    # data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
+    # init_data = pickle.load(open(data_files[0], "rb"))
+    # final_data = pickle.load(open(data_files[5], "rb"))
+    # init_shape = init_data["init_shape"]
+    # init_dir = init_data["init_directors"]
+    # target_shape = final_data["final_shape"]
+    # # target_shape[0, :] += 0.1
+    # # target_shape[1, :] += 0.1
+    # target_dir = final_data["final_directors"]
 
     ########################################
 
     # Run simulations for both models
     print("Running simulation for Model 1...")
-    all_actions_1, all_shapes_1 = run_model_simulation(dlo_diff_1, dlo_params, init_shape, init_dir, target_shape, num_iterations=10, half_exec=False)
+    all_actions_1, all_shapes_1 = run_model_simulation(dlo_diff_1, dlo_params, init_shape, init_dir, target_shape, num_iterations=100, half_exec=False)
     
     print("Running simulation for Model 2...")
-    all_actions_2, all_shapes_2 = run_model_simulation(dlo_diff_2, dlo_params, init_shape, init_dir, target_shape, num_iterations=10, half_exec=False)
+    all_actions_2, all_shapes_2 = run_model_simulation(dlo_diff_2, dlo_params, init_shape, init_dir, target_shape, num_iterations=100, half_exec=False)
 
     # Prepare data for plotting
     init_shape_ok = init_shape.T
@@ -503,3 +502,4 @@ if __name__ == "__main__":
 
     # Show the plot
     plt.show()
+

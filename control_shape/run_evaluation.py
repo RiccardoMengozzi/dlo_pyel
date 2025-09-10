@@ -243,15 +243,22 @@ if __name__ == "__main__":
     )
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "DATA/train")
-    NUM_SAMPLES = 1
+    DATA_PATH = os.path.join(MAIN_DIR, "DATA/val")
+    NUM_SAMPLES = 800
     NUM_ITERATIONS = 10
     PLOT = True
     
     # Define paths for both models
+
+
     CHECKPOINT_PATH_1 = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
-    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_winter-fire-65_best.pt")  # Replace with your second model path
-    
+    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_sage-pine-63_best.pt")  # Replace with your second model path
+    # Extract readable model names from checkpoint filenames
+    model_name_1 = os.path.splitext(os.path.basename(CHECKPOINT_PATH_1))[0]
+    model_name_2 = os.path.splitext(os.path.basename(CHECKPOINT_PATH_2))[0]
+    model_name_1 = model_name_1.replace("diffusion_", "").replace("_best", "")
+    model_name_2 = model_name_2.replace("diffusion_", "").replace("_best", "")
+
     # Load both models
     print("Loading Model 1...")
     model_1 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
@@ -269,7 +276,7 @@ if __name__ == "__main__":
 
 
     # Alternative: Load from dataset
-    test_dataset_path = "DATA/train"
+    test_dataset_path = "DATA/val"
     data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
     print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
     data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
@@ -280,13 +287,15 @@ if __name__ == "__main__":
     final_shape_files = random.choices(data_files, k=NUM_SAMPLES)
     test_set = []
     for (init, final) in zip(init_shapes_files, final_shape_files):
-        test_set.append((pickle.load(open(init, "rb")), pickle.load(open(init, "rb"))))
+        test_set.append((pickle.load(open(init, "rb")), pickle.load(open(final, "rb"))))
 
     # Run simulations
     results1 = []
     results2 = []
+    all_actions1 = []
+    all_shapes1 = []
     for sample in tqdm(test_set, desc="Evaluating models"):
-        result1, all_actions1, all_shapes1 = run_model_simulation(model_1, 
+        result1, all_action1, all_shape1 = run_model_simulation(model_1, 
                                         dlo_params, 
                                         sample[0]["init_shape"], 
                                         sample[0]["init_directors"], 
@@ -294,7 +303,7 @@ if __name__ == "__main__":
                                         num_iterations=NUM_ITERATIONS, 
                                         half_exec=False)
         
-        result2, all_actions2, all_shapes2 = run_model_simulation(model_2, 
+        result2, all_action1, all_shape1 = run_model_simulation(model_2, 
                                         dlo_params, 
                                         sample[0]["init_shape"], 
                                         sample[0]["init_directors"], 
@@ -303,9 +312,13 @@ if __name__ == "__main__":
                                         half_exec=False)
         results1.append(result1)
         results2.append(result2)
+        all_actions1.append(all_action1)
+        all_shapes1.append(all_shapes1)
 
     results1 = np.array(results1.copy())
     results2 = np.array(results2.copy())
+    all_actions1 = np.array(all_actions1.copy())
+    all_shapes1 = np.array(all_shapes1.copy())
 
     avg_avg_max1 = np.mean(results1, axis=0)
     avg_avg_max2 = np.mean(results2, axis=0)

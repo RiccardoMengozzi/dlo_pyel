@@ -6,5 +6,6 @@
 *.nbc
 *.nbi
 *.nbl
+*.zip
 *.egg-info/
 __pycache__/
