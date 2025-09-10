@@ -1,7 +1,5 @@
-/TEST
-/DATA
 /checkpoints
-/dataset*
+/dataset_*
 *.pyc
 *.nbc
 *.nbi

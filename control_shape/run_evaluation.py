@@ -243,8 +243,8 @@ if __name__ == "__main__":
     )
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "DATA/val")
-    NUM_SAMPLES = 800
+    DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
+    NUM_SAMPLES = 1
     NUM_ITERATIONS = 10
     PLOT = True
     
@@ -273,52 +273,75 @@ if __name__ == "__main__":
     dlo = DloModel(dlo_params)
     dlo.build_model(action=action)
 
-
-
-    # Alternative: Load from dataset
-    test_dataset_path = "DATA/val"
-    data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
-    print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
+    data_files = glob.glob(os.path.join(DATA_PATH, "*.pkl"))
+    print("Found {} files in dataset {}".format(len(data_files), DATA_PATH))
     data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
 
+    data_shape = []
+    data_dir = []
+    for data_file in data_files:
+        episode = pickle.load(open(data_file, "rb"))
+        for action in episode.values():
+            obs = action["obs"]
+            obs_dir = action["obs_dir"]
+            data_shape.append([obs])
+            data_dir.append([obs_dir])
+
+
+    print(f"Total actions: {len(data_shape)}")
+    data_shape = np.array(data_shape).squeeze().reshape(-1, 3, 51)
+    data_dir = np.array(data_dir).squeeze().reshape(-1, 3, 3, 50)
+    print(f"Total data: {len(data_shape)}")
+
+    data = [{"shape":s, "dir":d} for s, d in zip(data_shape, data_dir)]
 
     # create the test set: each file has init_shape, init_dir, final_shape, final_dir
-    init_shapes_files = random.choices(data_files, k=NUM_SAMPLES)
-    final_shape_files = random.choices(data_files, k=NUM_SAMPLES)
+    init_samples = random.choices(data, k=NUM_SAMPLES)
+    target_samples = random.choices(data, k=NUM_SAMPLES)
     test_set = []
-    for (init, final) in zip(init_shapes_files, final_shape_files):
-        test_set.append((pickle.load(open(init, "rb")), pickle.load(open(final, "rb"))))
+    for (init, target) in zip(init_samples, target_samples):
+        test_set.append({"init": init, "target": target})
 
     # Run simulations
     results1 = []
     results2 = []
-    all_actions1 = []
-    all_shapes1 = []
+    
+    all_actions_1 = []
+    all_actions_2 = []
+    all_shapes_1 = []
+    all_shapes_2 = []
+
     for sample in tqdm(test_set, desc="Evaluating models"):
-        result1, all_action1, all_shape1 = run_model_simulation(model_1, 
+        result1, all_sample_actions_1, all_sample_shapes_1 = run_model_simulation(model_1, 
                                         dlo_params, 
-                                        sample[0]["init_shape"], 
-                                        sample[0]["init_directors"], 
-                                        sample[1]["final_shape"], 
+                                        sample["init"]["shape"], 
+                                        sample["init"]["dir"], 
+                                        sample["target"]["shape"], 
                                         num_iterations=NUM_ITERATIONS, 
                                         half_exec=False)
         
-        result2, all_action1, all_shape1 = run_model_simulation(model_2, 
-                                        dlo_params, 
-                                        sample[0]["init_shape"], 
-                                        sample[0]["init_directors"], 
-                                        sample[1]["final_shape"], 
-                                        num_iterations=NUM_ITERATIONS, 
-                                        half_exec=False)
+        result2, all_sample_actions_2, all_sample_shapes_2 = run_model_simulation(model_2, 
+                                                                                dlo_params, 
+                                                                                sample["init"]["shape"], 
+                                                                                sample["init"]["dir"], 
+                                                                                sample["target"]["shape"], 
+                                                                                num_iterations=NUM_ITERATIONS, 
+                                                                                half_exec=False)
         results1.append(result1)
         results2.append(result2)
-        all_actions1.append(all_action1)
-        all_shapes1.append(all_shapes1)
 
-    results1 = np.array(results1.copy())
-    results2 = np.array(results2.copy())
-    all_actions1 = np.array(all_actions1.copy())
-    all_shapes1 = np.array(all_shapes1.copy())
+        all_actions_1.append(all_sample_actions_1)
+        all_actions_2.append(all_sample_actions_2)
+        all_shapes_1.append(all_sample_shapes_1)
+        all_shapes_2.append(all_sample_shapes_2)
+
+    results1 = np.array(results1)
+    results2 = np.array(results2)
+
+    all_actions_1 = np.array(all_actions_1)
+    all_actions_2 = np.array(all_actions_2)
+    all_shapes_1 = np.array(all_shapes_1)
+    all_shapes_2 = np.array(all_shapes_2)
 
     avg_avg_max1 = np.mean(results1, axis=0)
     avg_avg_max2 = np.mean(results2, axis=0)
@@ -338,8 +361,8 @@ if __name__ == "__main__":
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
     # Plot 1: Average Errors Comparison
-    ax1.plot(iterations, avg_errors_model1, 'b-o', label='Model 1 (super-brook-8)', linewidth=2, markersize=6)
-    ax1.plot(iterations, avg_errors_model2, 'r-s', label='Model 2 (winter-fire-65)', linewidth=2, markersize=6)
+    ax1.plot(iterations, avg_errors_model1, 'b-o', label=f'Model 1 {model_name_1}', linewidth=2, markersize=6)
+    ax1.plot(iterations, avg_errors_model2, 'r-s', label=f'Model 2 {model_name_2}', linewidth=2, markersize=6)
     ax1.set_xlabel('Iteration')
     ax1.set_ylabel('Average Error')
     ax1.set_title('Average Error Comparison')
@@ -348,8 +371,8 @@ if __name__ == "__main__":
     ax1.set_yscale('log')  # Use log scale if errors vary significantly
 
     # Plot 2: Max Errors Comparison
-    ax2.plot(iterations, max_errors_model1, 'b-o', label='Model 1 (super-brook-8)', linewidth=2, markersize=6)
-    ax2.plot(iterations, max_errors_model2, 'r-s', label='Model 2 (winter-fire-65)', linewidth=2, markersize=6)
+    ax2.plot(iterations, max_errors_model1, 'b-o', label=f'Model 1 {model_name_1}', linewidth=2, markersize=6)
+    ax2.plot(iterations, max_errors_model2, 'r-s', label=f'Model 2 {model_name_2}', linewidth=2, markersize=6)
     ax2.set_xlabel('Iteration')
     ax2.set_ylabel('Maximum Error')
     ax2.set_title('Maximum Error Comparison')
@@ -362,38 +385,38 @@ if __name__ == "__main__":
 
     # Print summary statistics
     print("\n=== Model Performance Summary ===")
-    print(f"Model 1 (super-brook-8):")
-    print(f"  Final Average Error: {avg_errors_model1[-1]:.6f}")
-    print(f"  Final Max Error: {max_errors_model1[-1]:.6f}")
-    print(f"  Average of Average Errors: {np.mean(avg_errors_model1):.6f}")
-    print(f"  Average of Max Errors: {np.mean(max_errors_model1):.6f}")
+    print(f"Model 1 {model_name_1}:")
+    print(f"  Average of Average Errors after {NUM_ITERATIONS} actions: {avg_errors_model1[-1]:.6f}")
+    print(f"  Average of Max Errors after {NUM_ITERATIONS} actions: {max_errors_model1[-1]:.6f}")
 
-    print(f"\nModel 2 (winter-fire-65):")
-    print(f"  Final Average Error: {avg_errors_model2[-1]:.6f}")
-    print(f"  Final Max Error: {max_errors_model2[-1]:.6f}")
-    print(f"  Average of Average Errors: {np.mean(avg_errors_model2):.6f}")
-    print(f"  Average of Max Errors: {np.mean(max_errors_model2):.6f}")
+    print(f"\nModel 2 {model_name_2}:")
+    print(f"  Average of Average Errors after {NUM_ITERATIONS} actions: {avg_errors_model2[-1]:.6f}")
+    print(f"  Average of Max Errors after {NUM_ITERATIONS} actions: {max_errors_model2[-1]:.6f}")
 
     # Determine which model performs better
     if avg_errors_model1[-1] < avg_errors_model2[-1]:
-        print(f"\n✓ Model 1 achieves lower final average error")
+        print(f"\n✓ Model 1 performes {(avg_errors_model2[-1] / avg_errors_model1[-1] - 1)}% better on average error after {NUM_ITERATIONS} actions")
     else:
-        print(f"\n✓ Model 2 achieves lower final average error")
+        print(f"\n✓ Model 2 performes {(avg_errors_model1[-1] / avg_errors_model2[-1] - 1)}% better on average error after {NUM_ITERATIONS} actions")
 
     if max_errors_model1[-1] < max_errors_model2[-1]:
-        print(f"✓ Model 1 achieves lower final max error")
+        print(f"\n✓ Model 1 performes {(max_errors_model2[-1] / max_errors_model1[-1] - 1)}% better on max error after {NUM_ITERATIONS} actions")
     else:
-        print(f"✓ Model 2 achieves lower final max error")
-
+        print(f"\n✓ Model 1 performes {(max_errors_model1[-1] / max_errors_model2[-1] - 1)}% better on max error after {NUM_ITERATIONS} actions")
 
 
 
 
 
     if PLOT:
+        idx = 0
 
-        init_shape = test_set[0][0]["init_shape"]
-        target_shape = test_set[0][1]["final_shape"]
+        init_shape = test_set[idx]["init"]["shape"]
+        target_shape = test_set[idx]["target"]["shape"]
+        all_shapes_1 = all_shapes_1[idx]
+        all_actions_1 = all_actions_1[idx]
+        all_shapes_2 = all_shapes_2[idx]
+        all_actions_2 = all_actions_2[idx]
         init_shape_ok = init_shape.T
         target_shape_ok = target_shape.T
 
@@ -404,7 +427,7 @@ if __name__ == "__main__":
 
         # Create slider
         ax_slider = plt.axes([0.2, 0.05, 0.6, 0.03])
-        max_iterations = max(len(all_actions1), len(all_actions2)) - 1
+        max_iterations = max(len(all_actions_1), len(all_actions_2)) - 1
         slider = Slider(ax_slider, 'Iteration', 0, max_iterations, valinit=0, valstep=1, valfmt='%d')
 
         def update_plot(iteration):
@@ -412,15 +435,15 @@ if __name__ == "__main__":
             iteration = int(iteration)
             
             # Plot Model 1 (only if iteration is within range)
-            if iteration < len(all_actions1):
-                plot_single_model(ax1, iteration, all_actions1, all_shapes1, init_shape_ok, target_shape_ok, "Model 1")
+            if iteration < len(all_actions_1):
+                plot_single_model(ax1, iteration, all_actions_1, all_shapes_1, init_shape_ok, target_shape_ok, "Model 1")
             else:
                 ax1.clear()
                 ax1.set_title(f"Model 1 - No data for iteration {iteration+1}")
             
             # Plot Model 2 (only if iteration is within range)
-            if iteration < len(all_actions2):
-                plot_single_model(ax2, iteration, all_actions2, all_shapes2, init_shape_ok, target_shape_ok, "Model 2")
+            if iteration < len(all_actions_2):
+                plot_single_model(ax2, iteration, all_actions_2, all_shapes_2, init_shape_ok, target_shape_ok, "Model 2")
             else:
                 ax2.clear()
                 ax2.set_title(f"Model 2 - No data for iteration {iteration+1}")
