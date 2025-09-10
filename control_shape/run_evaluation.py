@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
-    NUM_SAMPLES = 1
+    NUM_SAMPLES = 1000
     NUM_ITERATIONS = 10
     PLOT = True
     
