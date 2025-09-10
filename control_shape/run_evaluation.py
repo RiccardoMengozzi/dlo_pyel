@@ -12,7 +12,7 @@ from diffusers.schedulers import DDPMScheduler
 from conditional_1d_unet import ConditionalUnet1D
 from normalize import compute_cs0_csR, normalize_dlo, check_rot_and_flip
 from normalize import denormalize_action_horizon, convert_action_horizon_to_absolute
-from compute_directors import create_directors_from_positions
+
 
 # Cosserat Model
 from pyel_model.dlo_model import DloModel, DloModelParams
@@ -149,8 +149,6 @@ def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shap
 
     for i in range(num_iterations):
         # run diffusion to get the predicted action
-        print(dlo_0.shape)
-        print(target_shape.shape)
         dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(dlo_0, target_shape)
 
         list_shapes, list_directors = [], []
@@ -246,7 +244,7 @@ if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
-    NUM_SAMPLES = 1000
+    NUM_SAMPLES = 10
     NUM_ITERATIONS = 10
     PLOT = True
     
