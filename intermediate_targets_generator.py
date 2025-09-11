@@ -21,27 +21,40 @@ def plot(init_shape, target_shape, intermediate_shapes, cmap_type="viridis", fig
 
 
 
-def compute_lengths(intermediate_shapes, verbose=False):
-    intermediate_lengths = []
-    for shape in intermediate_shapes:
+def compute_lengths(shapes, verbose=False):
+    lengths = []
+    for shape in shapes:
         length = np.sum([np.linalg.norm(shape[i, :2] - shape[i + 1, :2]) for i in range(shape.shape[0] - 1)])
-        intermediate_lengths.append(length)
-    intermediate_lengths = np.array(intermediate_lengths)
+        lengths.append(length)
+    lengths = np.array(lengths)
 
     if verbose:
-        for i, length in enumerate(intermediate_lengths):
+        for i, length in enumerate(lengths):
             print(f"Intermediate shape number {i+1} length: {length}")
 
-    return intermediate_lengths
+    return lengths
 
-def get_intermediate_shapes(init_shape, target_shape, num_shapes, verbose=False):
+
+
+def get_intermediate_shapes(init_shape, target_shape, num_shapes, mode="uniform", verbose=False):
+    """
+    uniform mode
+    quadratic mode
+    """
 
     intermediate_shapes = []
 
     # Compute per-particle distance:
-    distances = target_shape[:, :2] - init_shape[:, :2]
+    d = target_shape[:, :2] - init_shape[:, :2]
     for i in range(1, num_shapes + 1):
-        intermediate_shapes.append(distances * i / (num_shapes + 1) + init_shape[:, :2])
+        if mode=="uniform":
+            intermediate_shapes.append(d * i / (num_shapes + 1) + init_shape[:, :2])
+        elif mode=="quadratic":
+            intermediate_shapes.append(d*(1 - 2**-i) + init_shape[:, :2])
+        elif mode=="cubic":
+            intermediate_shapes.append(d*(1 - 3**-i) + init_shape[:, :2])
+        else:
+            raise ValueError("Specify a correct interpolation mode between ['uniform', 'quadratic', 'cubic']")
     intermediate_shapes = np.array(intermediate_shapes)
 
     # Compute lengths
@@ -114,9 +127,9 @@ def main():
         samples = random.choices(all_samples, k=2)
         dlo_0 = samples[0]["dlo_0"]
         dlo_1 = samples[1]["dlo_1"]
-        NUM = 2
+        NUM = 10
 
-        intermediate_shapes = get_intermediate_shapes(dlo_0, dlo_1, NUM, verbose=True)
+        intermediate_shapes = get_intermediate_shapes(dlo_0, dlo_1, NUM, mode="cubic", verbose=True)
         plot(dlo_0, dlo_1, intermediate_shapes, cmap_type='viridis', figsize=(10, 10))        
 
 

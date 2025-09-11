@@ -12,7 +12,7 @@ from conditional_1d_unet import ConditionalUnet1D
 from normalize import compute_cs0_csR, normalize_dlo, check_rot_and_flip
 from normalize import denormalize_action_horizon, convert_action_horizon_to_absolute
 from compute_directors import create_directors_from_positions
-from intermediate_targets_generator import get_intermediate_shapes
+from intermediate_targets_generator import get_intermediate_shapes, compute_lengths
 
 # Cosserat Model
 from pyel_model.dlo_model import DloModel, DloModelParams
@@ -367,7 +367,7 @@ def run_intermediate(dlo_diff,
 
         intermediate_targets = intermediate_targets[idxs]
     else:
-        intermediate_targets = get_intermediate_shapes(dlo_0.T, target_shape.T, num_intermediate_targets)
+        intermediate_targets = get_intermediate_shapes(dlo_0.T, target_shape.T, num_intermediate_targets, mode="quadratic")
         intermediate_targets = np.moveaxis(intermediate_targets, 1, 2)
 
 
@@ -479,12 +479,12 @@ if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
-    NUM_ITERATIONS = 10  # Iterations for standard technique
-    NUM_INTERMEDIATE_TARGETS = 2
+    NUM_ITERATIONS = 15  # Iterations for standard technique
+    NUM_INTERMEDIATE_TARGETS = 5
     PLOT = True
     
     # Define path for the model
-    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
+    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_sage-pine-63_best.pt")
     
     # Load the model
     print("Loading Model...")
@@ -513,8 +513,7 @@ if __name__ == "__main__":
     print(f"Total samples (actions): {len(all_samples)}")
 
 
-    sample = all_samples[80]
-
+    sample = all_samples[50]
 
     # Run simulations for both models
     print("Running simulation for Model 1...")
@@ -589,4 +588,5 @@ if __name__ == "__main__":
 
     # Show the plot
     plt.show()
+
 
