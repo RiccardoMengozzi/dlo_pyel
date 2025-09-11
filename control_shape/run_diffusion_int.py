@@ -12,6 +12,7 @@ from conditional_1d_unet import ConditionalUnet1D
 from normalize import compute_cs0_csR, normalize_dlo, check_rot_and_flip
 from normalize import denormalize_action_horizon, convert_action_horizon_to_absolute
 from compute_directors import create_directors_from_positions
+from intermediate_targets_generator import get_intermediate_shapes
 
 # Cosserat Model
 from pyel_model.dlo_model import DloModel, DloModelParams
@@ -348,43 +349,43 @@ def run_intermediate(dlo_diff,
                      intermediate_targets, 
                      num_intermediate_targets=2, 
                      num_iterations=5, 
-                     half_exec=True):
+                     half_exec=True,
+                     use_dataset=False):
     """Run simulation for a single model and return all actions and shapes"""
     dlo_0 = dlo_0.T
     dir_0 = dir_0
     target_shape = dlo_1.T
     
-    # evenly spaced indices
-    step = intermediate_targets.shape[0] / num_intermediate_targets
-    idxs = [int(step/2 + step*i) for i in range(num_intermediate_targets)]
+    if use_dataset:
+        # evenly spaced indices
+        step = intermediate_targets.shape[0] / num_intermediate_targets
+        idxs = [int(step/2 + step*i) for i in range(num_intermediate_targets)]
 
-    # shift to center if only one index
-    if num_intermediate_targets == 1:
-        idxs = [intermediate_targets.shape[0] // 2]  # middle element
+        # shift to center if only one index
+        if num_intermediate_targets == 1:
+            idxs = [intermediate_targets.shape[0] // 2]  # middle element
 
-    intermediate_targets = intermediate_targets[idxs]
+        intermediate_targets = intermediate_targets[idxs]
+    else:
+        intermediate_targets = get_intermediate_shapes(dlo_0.T, target_shape.T, num_intermediate_targets)
+        intermediate_targets = np.moveaxis(intermediate_targets, 1, 2)
+
+
 
     target_shape_expanded = target_shape[np.newaxis, :, :]  # shape (1, 3, 51)
-
     # Concatenate along axis 0
     intermediate_targets = np.concatenate((intermediate_targets, target_shape_expanded), axis=0)
 
 
     all_actions = []
     all_shapes = []
-    for i in tqdm(range(num_iterations), desc="performing actions"):
+    for i in range(num_iterations):
         if i < intermediate_targets.shape[0]:
             target_shape = intermediate_targets[i]
 
 
         # run diffusion to get the predicted action
         dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(dlo_0, target_shape)
-
-        # convert the predicted action to the absolute frame for plotting
-        act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0_diff, pred_action)
-
-        # apply the predicted action to the DLO model
-        action_idx = pred_action[0, 0]
 
         list_shapes, list_directors = [], []
         pred_action = pred_action[:int(pred_action.shape[0] // 2 + 1), :] if half_exec else pred_action
@@ -407,6 +408,7 @@ def run_intermediate(dlo_diff,
     all_shapes = np.array(all_shapes)
     
     return all_actions, all_shapes, intermediate_targets
+
 
 
 
@@ -477,8 +479,8 @@ if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
-    NUM_ITERATIONS = 30  # Iterations for standard technique
-    NUM_INTERMEDIATE_TARGETS = 20
+    NUM_ITERATIONS = 10  # Iterations for standard technique
+    NUM_INTERMEDIATE_TARGETS = 2
     PLOT = True
     
     # Define path for the model
@@ -533,7 +535,8 @@ if __name__ == "__main__":
                                                                          sample["obs"],
                                                                          num_iterations=NUM_ITERATIONS,
                                                                          num_intermediate_targets=NUM_INTERMEDIATE_TARGETS,
-                                                                         half_exec=False)
+                                                                         half_exec=False,
+                                                                         use_dataset=False)
 
     # Prepare data for plotting
     init_shape_ok = sample["dlo_0"]

@@ -81,7 +81,15 @@ def get_intermediate_shapes(init_shape, target_shape, num_shapes, verbose=False)
         print("dlo_0 total length = ", dlo_0_length)
         print("dlo_1 total length = ", dlo_1_length)
 
-    return adjusted_shapes
+    # add z axis
+    adjusted_shapes_with_z = []
+
+    for shape in adjusted_shapes:
+        shape_with_z = np.hstack((shape, init_shape[:, 2:3]))  # use original z for each particle
+        adjusted_shapes_with_z.append(shape_with_z)
+
+    adjusted_shapes_with_z = np.array(adjusted_shapes_with_z)
+    return adjusted_shapes_with_z
 
 
 
