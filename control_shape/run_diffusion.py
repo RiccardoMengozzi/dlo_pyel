@@ -282,7 +282,6 @@ class DiffusionInference:
         pred_action = pred_actions[-1]  # take the last action from the denoised actions
 
         ############################
-
         act = denormalize_action_horizon(
             dlo_0,
             pred_action,
@@ -307,13 +306,7 @@ def run_model_simulation(dlo_diff, dlo_params, init_shape, init_dir, target_shap
     for i in tqdm(range(num_iterations), desc="performing actions"):
 
         # run diffusion to get the predicted action
-        dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(dlo_0, target_shape)
-
-        # convert the predicted action to the absolute frame for plotting
-        act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0_diff, pred_action)
-
-        # apply the predicted action to the DLO model
-        action_idx = pred_action[0, 0]
+        dlo_0_n, dlo_1_n, pred_action = dlo_diff.run(dlo_0, target_shape)
 
         list_shapes, list_directors = [], []
         pred_action = pred_action[:int(pred_action.shape[0] // 2 + 1), :] if half_exec else pred_action
@@ -404,7 +397,7 @@ if __name__ == "__main__":
     
     # Define paths for both models
     CHECKPOINT_PATH_1 = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
-    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_serene-shadow-12_best.pt")  # Replace with your second model path
+    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_proud-eon-67_best.pt")  # Replace with your second model path
     
     # Load both models
     print("Loading Model 1...")

@@ -137,7 +137,7 @@ class DiffusionInference:
             pred_action_pos = pred_actions[i][:, 1:3] * self.disp_scale + dlo_0_n[pred_idx]
             list_pred_action_pos.append(pred_action_pos)
 
-        if True:
+        if False:
             from matplotlib.widgets import Slider
 
             # Plot initialization
@@ -153,18 +153,14 @@ class DiffusionInference:
             try:
                 action_pos = list_pred_action_pos[initial_i]
                 color_vals = np.linspace(0, 1, action_pos.shape[0])
-                scatter = ax.scatter(
-                    action_pos[:, 0], action_pos[:, 1],
-                    c=color_vals, cmap="inferno", s=50, alpha=0.8
-                )
+                scatter = ax.scatter(action_pos[:, 0], action_pos[:, 1], c=color_vals, cmap="inferno", s=50, alpha=0.8)
             except Exception as e:
                 print(f"Error denormalizing action {initial_i}: {e}")
                 scatter = ax.scatter([], [], c=[], cmap="inferno", s=50, alpha=0.8)
 
             # Add slider
             ax_slider = plt.axes([0.2, 0.1, 0.6, 0.03])
-            slider = Slider(ax_slider, "Action Index", 0, len(pred_actions) - 1,
-                            valinit=initial_i, valstep=1)
+            slider = Slider(ax_slider, "Action Index", 0, len(pred_actions) - 1, valinit=initial_i, valstep=1)
 
             # Update function
             def update(val):
@@ -182,8 +178,6 @@ class DiffusionInference:
 
             # Final touches
             ax.axis("equal")
-            ax.set_xlim(0, 0.6)     # <-- Fix x range
-            ax.set_ylim(-0.3, 0.3)  # <-- Fix y range
             ax.legend()
             plt.tight_layout()
             plt.show()
@@ -192,7 +186,7 @@ class DiffusionInference:
 if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "dataset_spline/val")
+    DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
     CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_proud-eon-67_best.pt")
 
     dlo_diff = DiffusionInference(CHECKPOINT_PATH, device="cuda")
