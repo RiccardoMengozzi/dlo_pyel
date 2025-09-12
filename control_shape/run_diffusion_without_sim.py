@@ -7,8 +7,7 @@ from tqdm import tqdm
 import pickle, glob, random
 
 # DLO_DIFFUSION
-from diffusers.schedulers import DDPMScheduler
-from conditional_1d_unet import ConditionalUnet1D
+from inference import DiffusionInference
 from normalize import compute_cs0_csR, normalize_dlo, check_rot_and_flip
 from normalize import denormalize_action_horizon, convert_action_horizon_to_absolute
 from compute_directors import create_directors_from_positions
@@ -124,130 +123,11 @@ DLO_1_N_TEST =  np.array([[-0.24070267,  0.00292686],
 
 
 
-
-class DiffusionInference:
-    def __init__(self, checkpoint_path, device="cpu"):
-
-        state = torch.load(checkpoint_path)
-
-        self.disp_scale = state["scale_disp"]
-        self.angle_scale = state["scale_rot"]
-        self.num_points = state["num_points"]
-
-        self.pred_horizon = state["pred_h_dim"]
-        self.obs_dim = state["obs_dim"]
-        self.obs_h_dim = state["obs_h_dim"]
-        self.action_dim = state["action_dim"]
-        self.device = device
-
-        self.noise_steps = 100
-
-        # Build diffusion components
-        self.noise_scheduler = DDPMScheduler(
-            num_train_timesteps=self.noise_steps,
-            beta_schedule="squaredcos_cap_v2",
-            clip_sample=True,
-            prediction_type="epsilon",
-        )
-
-        self.model = ConditionalUnet1D(
-            input_dim=state["action_dim"], global_cond_dim=state["obs_dim"] * state["obs_h_dim"]
-        )
-        self.model.load_state_dict(state["model"])
-        self.model.to(self.device)
-        self.model.eval()
-
-    def run_denoise_action(self, obs_horizon, progress_bar=True):
-
-        norm_obs_tensor = torch.from_numpy(obs_horizon.copy()).float().unsqueeze(0).to(self.device)
-
-        obs_cond = norm_obs_tensor.flatten(start_dim=1).to(self.device)
-
-        # initialize action from Gaussian noise
-        naction = torch.randn((1, self.pred_horizon, self.action_dim), device=self.device)
-
-        # init scheduler
-        self.noise_scheduler.set_timesteps(self.noise_steps)
-
-        list_actions = []
-        for k in tqdm(self.noise_scheduler.timesteps, disable=not progress_bar):
-            # predict noise
-            noise_pred = self.model(sample=naction, timestep=k, global_cond=obs_cond)
-
-            # inverse diffusion step (remove noise)
-            naction = self.noise_scheduler.step(model_output=noise_pred, timestep=k, sample=naction).prev_sample
-
-            list_actions.append(naction.squeeze().detach().cpu().numpy())
-
-        return np.stack(list_actions, axis=0)
-
-    def normalize_observation(self, dlo_0, dlo_1):
-        # compute normalization factors
-        cs0, csR = compute_cs0_csR(dlo_0)
-
-        # dlo shape
-        dlo_0_n = normalize_dlo(dlo_0, cs0, csR)
-        dlo_1_n = normalize_dlo(dlo_1, cs0, csR)
-
-        # check rot
-        dlo_0_n, dlo_1_n, rot_check_flag = check_rot_and_flip(dlo_0_n, dlo_1_n)
-
-        return dlo_0_n, dlo_1_n, cs0, csR, rot_check_flag
-
-    def prepare_obs_action(obs_n, dlo_1_n, action_n):
-
-        action_steps = action_n[1:] / obs_n.shape[1]
-        actions_idx = np.tile(action_n[0], (obs_n.shape[0], 1))
-        actions = np.tile(action_steps, (obs_n.shape[0], 1))
-        actions = np.concatenate([actions_idx, actions], axis=1)
-
-        obs_target = np.tile(dlo_1_n, (obs_n.shape[0], 1, 1))
-        norm_obs = np.concatenate([obs_n, obs_target], axis=1)
-
-        # flatten the observation
-        norm_obs = norm_obs.reshape(norm_obs.shape[0], -1)
-
-        return norm_obs, actions
-
-    def run(self, dlo_0, dlo_1):
-
-        #
-        dlo_0 = dlo_0.T
-        dlo_1 = dlo_1.T
-        dlo_0 = dlo_0[:, :2]  # take only x and y coordinates
-        dlo_1 = dlo_1[:, :2]  # take only x and y coordinates
-
-        # Normalize observation
-        dlo_0_n, dlo_1_n, cs0, csR, rot_check_flag = self.normalize_observation(dlo_0, dlo_1)
-
-        obs_0 = np.tile(dlo_0_n, (self.obs_h_dim, 1, 1))  # repeat for the obs horizon
-        obs_target = np.tile(dlo_1_n, (self.obs_h_dim, 1, 1))
-        norm_obs = np.concatenate([obs_0, obs_target], axis=1)
-
-        ###################################################################
-        pred_actions = self.run_denoise_action(norm_obs, progress_bar=False)
-        pred_action = pred_actions[-1]  # take the last action from the denoised actions
-
-        ############################
-
-        act = denormalize_action_horizon(
-            dlo_0,
-            pred_action,
-            cs0,
-            csR,
-            disp_scale=self.disp_scale,
-            angle_scale=self.angle_scale,
-            rot_check_flag=rot_check_flag,
-        )
-
-        return dlo_0, dlo_1, act
-
-
 if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_linear/train")
-    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_proud-eon-67_best.pt")
+    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_sage-pine-63_best.pt")
 
 
     dlo_diff = DiffusionInference(CHECKPOINT_PATH, device="cuda")
@@ -273,9 +153,10 @@ if __name__ == "__main__":
         
 
         # run diffusion to get the predicted action
-        dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(init_shape.T, target_shape.T)
+        dlo_0, dlo_1, pred_action = dlo_diff.run(init_shape, target_shape)
         # convert the predicted action to the absolute frame for plotting
-        act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0_diff, pred_action)
+
+        act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0, pred_action)
 
         # Simple single frame plot
         plt.figure(figsize=(10, 8))

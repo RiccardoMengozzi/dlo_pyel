@@ -217,3 +217,17 @@ def convert_action_horizon_to_absolute(dlo_state, action_horizon):
         list_action_rot.append(action_rot)
 
     return np.stack(list_action_points, axis=0), np.stack(list_action_rot, axis=0)
+
+
+def normalize_observation(dlo_0, dlo_1):
+    # compute normalization factors
+    cs0, csR = compute_cs0_csR(dlo_0)
+
+    # dlo shape
+    dlo_0_n = normalize_dlo(dlo_0, cs0, csR)
+    dlo_1_n = normalize_dlo(dlo_1, cs0, csR)
+
+    # check rot
+    dlo_0_n, dlo_1_n, rot_check_flag = check_rot_and_flip(dlo_0_n, dlo_1_n)
+
+    return dlo_0_n, dlo_1_n, cs0, csR, rot_check_flag
