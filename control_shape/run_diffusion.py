@@ -400,69 +400,75 @@ if __name__ == "__main__":
     )
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "dataset_20250909_123420")
+    DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
     
     # Define paths for both models
     CHECKPOINT_PATH_1 = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
-    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_serene-shadow-12_best_TRAJ.pt")  # Replace with your second model path
+    CHECKPOINT_PATH_2 = os.path.join(MAIN_DIR, "checkpoints/diffusion_serene-shadow-12_best.pt")  # Replace with your second model path
     
     # Load both models
     print("Loading Model 1...")
-    dlo_diff_1 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
+    model_1 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
     
     print("Loading Model 2...")
-    dlo_diff_2 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
+    model_2 = DiffusionInference(CHECKPOINT_PATH_2, device="cuda")
 
     ################################
 
     # Initialize DLO model and get initial conditions
+    # action = [0, 0.0, 0.0, 0.0]
+    # dlo = DloModel(dlo_params)
+    # dlo.build_model(action=action)
+    # dict_out = dlo.run_simulation()
+    # init_shape = dict_out["final_shape"]
+    # init_dir = dict_out["final_directors"]
+    # # Set up target shape
+    # R = [[0.0, 1.0],
+    #      [-1.0, 0.0]]
+    # target_shape = DLO_1_N_TEST @ R 
+    # target_dir, target_shape = create_directors_from_positions(target_shape)
+    # target_shape = target_shape.T
+    # # Move centers to be in same position
+    # init_shape_center = np.mean(init_shape, axis=1)
+    # target_shape_center = np.mean(target_shape, axis=1)
+    # centers_distance = target_shape_center - init_shape_center
+    # init_shape = (init_shape.T + centers_distance).T
+    # target_dir = np.array(target_dir)[0:-1]
+    # target_dir = np.moveaxis(target_dir, 0, -1)
+
+    # Initialize DLO model
+    import pickle, glob, random
     action = [0, 0.0, 0.0, 0.0]
     dlo = DloModel(dlo_params)
     dlo.build_model(action=action)
-    dict_out = dlo.run_simulation()
-    init_shape = dict_out["final_shape"]
-    init_dir = dict_out["final_directors"]
-    # Set up target shape
-    R = [[0.0, 1.0],
-         [-1.0, 0.0]]
-    target_shape = DLO_1_N_TEST @ R 
-    target_dir, target_shape = create_directors_from_positions(target_shape)
-    target_shape = target_shape.T
-    # Move centers to be in same position
-    init_shape_center = np.mean(init_shape, axis=1)
-    target_shape_center = np.mean(target_shape, axis=1)
-    centers_distance = target_shape_center - init_shape_center
-    init_shape = (init_shape.T + centers_distance).T
-    target_dir = np.array(target_dir)[0:-1]
-    target_dir = np.moveaxis(target_dir, 0, -1)
 
-    # Alternative: Load from dataset
-    # import glob, pickle
-    # test_dataset_path = "DATA/val"
-    # data_files = glob.glob(os.path.join(test_dataset_path, "*.pkl"))
-    # print("Found {} files in dataset {}".format(len(data_files), test_dataset_path))
-    # data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
-    # init_data = pickle.load(open(data_files[0], "rb"))
-    # final_data = pickle.load(open(data_files[5], "rb"))
-    # init_shape = init_data["init_shape"]
-    # init_dir = init_data["init_directors"]
-    # target_shape = final_data["final_shape"]
-    # # target_shape[0, :] += 0.1
-    # # target_shape[1, :] += 0.1
-    # target_dir = final_data["final_directors"]
+    # Load all samples (each action from each episode is a separate sample)
+    data_files = glob.glob(os.path.join(DATA_PATH, "*.pkl"))
+    print("Found {} episode files in dataset {}".format(len(data_files), DATA_PATH))
+    data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
+
+    all_samples = []
+    for data_file in data_files:
+        episode = pickle.load(open(data_file, "rb"))
+        # Each action in the episode is a separate sample
+        for action_key, action_data in episode.items():
+            all_samples.append(action_data)
+
+    init_sample = random.choice(all_samples)
+    final_sample = random.choice(all_samples)
+
+    init_shape = init_sample["dlo_0"]
+    init_dir = init_sample["dir_0"]
+    target_shape = final_sample["dlo_1"]
 
     ########################################
 
     # Run simulations for both models
     print("Running simulation for Model 1...")
-    all_actions_1, all_shapes_1 = run_model_simulation(dlo_diff_1, dlo_params, init_shape, init_dir, target_shape, num_iterations=100, half_exec=False)
+    all_actions_1, all_shapes_1 = run_model_simulation(model_1, dlo_params, init_shape.T, init_dir, target_shape.T, num_iterations=10, half_exec=False)
     
     print("Running simulation for Model 2...")
-    all_actions_2, all_shapes_2 = run_model_simulation(dlo_diff_2, dlo_params, init_shape, init_dir, target_shape, num_iterations=100, half_exec=False)
-
-    # Prepare data for plotting
-    init_shape_ok = init_shape.T
-    target_shape_ok = target_shape.T
+    all_actions_2, all_shapes_2 = run_model_simulation(model_2, dlo_params, init_shape.T, init_dir, target_shape.T, num_iterations=10, half_exec=False)
 
     # Create the figure with two subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
@@ -479,14 +485,14 @@ if __name__ == "__main__":
         
         # Plot Model 1 (only if iteration is within range)
         if iteration < len(all_actions_1):
-            plot_single_model(ax1, iteration, all_actions_1, all_shapes_1, init_shape_ok, target_shape_ok, "Model 1")
+            plot_single_model(ax1, iteration, all_actions_1, all_shapes_1, init_shape, target_shape, "Model 1")
         else:
             ax1.clear()
             ax1.set_title(f"Model 1 - No data for iteration {iteration+1}")
         
         # Plot Model 2 (only if iteration is within range)
         if iteration < len(all_actions_2):
-            plot_single_model(ax2, iteration, all_actions_2, all_shapes_2, init_shape_ok, target_shape_ok, "Model 2")
+            plot_single_model(ax2, iteration, all_actions_2, all_shapes_2, init_shape, target_shape, "Model 2")
         else:
             ax2.clear()
             ax2.set_title(f"Model 2 - No data for iteration {iteration+1}")

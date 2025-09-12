@@ -4,6 +4,7 @@ from matplotlib.widgets import Slider
 import numpy as np
 import os
 from tqdm import tqdm
+import pickle, glob, random
 
 # DLO_DIFFUSION
 from diffusers.schedulers import DDPMScheduler
@@ -12,8 +13,6 @@ from normalize import compute_cs0_csR, normalize_dlo, check_rot_and_flip
 from normalize import denormalize_action_horizon, convert_action_horizon_to_absolute
 from compute_directors import create_directors_from_positions
 
-# Cosserat Model
-from pyel_model.dlo_model import DloModel, DloModelParams
 
 np.set_printoptions(precision=8, suppress=True, linewidth=100, threshold=1000)
 
@@ -247,47 +246,57 @@ class DiffusionInference:
 if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
-    DATA_PATH = os.path.join(MAIN_DIR, "DATA/train")
-    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_super-brook-8_best.pt")
+    DATA_PATH = os.path.join(MAIN_DIR, "dataset_linear/train")
+    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_proud-eon-67_best.pt")
 
 
     dlo_diff = DiffusionInference(CHECKPOINT_PATH, device="cuda")
 
 
-    ######### TEST #########
+    # Load all samples (each action from each episode is a separate sample)
+    data_files = glob.glob(os.path.join(DATA_PATH, "*.pkl"))
+    print("Found {} episode files in dataset {}".format(len(data_files), DATA_PATH))
+    data_files.sort(key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[0]))
 
-    init_shape = DLO_0_N_TEST
-    target_shape = DLO_1_N_TEST
+    all_samples = []
+    for data_file in data_files:
+        episode = pickle.load(open(data_file, "rb"))
+        # Each action in the episode is a separate sample
+        for action_key, action_data in episode.items():
+            all_samples.append(action_data)
 
-    ########################################
 
-    print(init_shape.shape)
-    print(target_shape.shape)
-    # run diffusion to get the predicted action
-    dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(init_shape.T, target_shape.T)
-    # convert the predicted action to the absolute frame for plotting
-    act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0_diff, pred_action)
+    while True:
+        sample = random.choice(all_samples)
+        init_shape = sample["dlo_0"]
+        target_shape = sample["dlo_1"]
+        
 
-    # Simple single frame plot
-    plt.figure(figsize=(10, 8))
-    
-    
-    # Plot initial and target shapes
-    plt.plot(init_shape[:, 0], init_shape[:, 1], label="Initial Shape", marker="o", zorder=5)
-    plt.plot(target_shape[:, 0], target_shape[:, 1], label="Target Shape", marker="x", zorder=4)
-    
-    # Plot predicted actions
-    color_vals = np.linspace(0, 1, act_global_pos.shape[0])
-    plt.scatter(
-        act_global_pos[:, 0], act_global_pos[:, 1], c=color_vals, cmap="inferno", s=50, alpha=0.8, zorder=6
-    )
-    
-    plt.title("Diffusion DLO Simulation")
-    plt.xlabel("X Position")
-    plt.ylabel("Y Position")
-    plt.legend()
-    plt.grid()
-    plt.axis("equal")
-    plt.tight_layout()
-    
-    plt.show()
+        # run diffusion to get the predicted action
+        dlo_0_diff, dlo_1_diff, pred_action = dlo_diff.run(init_shape.T, target_shape.T)
+        # convert the predicted action to the absolute frame for plotting
+        act_global_pos, _ = convert_action_horizon_to_absolute(dlo_0_diff, pred_action)
+
+        # Simple single frame plot
+        plt.figure(figsize=(10, 8))
+        
+        
+        # Plot initial and target shapes
+        plt.plot(init_shape[:, 0], init_shape[:, 1], label="Initial Shape", marker="o", zorder=5)
+        plt.plot(target_shape[:, 0], target_shape[:, 1], label="Target Shape", marker="x", zorder=4)
+        
+        # Plot predicted actions
+        color_vals = np.linspace(0, 1, act_global_pos.shape[0])
+        plt.scatter(
+            act_global_pos[:, 0], act_global_pos[:, 1], c=color_vals, cmap="inferno", s=50, alpha=0.8, zorder=6
+        )
+        
+        plt.title("Diffusion DLO Simulation")
+        plt.xlabel("X Position")
+        plt.ylabel("Y Position")
+        plt.legend()
+        plt.grid()
+        plt.axis("equal")
+        plt.tight_layout()
+        
+        plt.show()

@@ -479,12 +479,12 @@ if __name__ == "__main__":
 
     MAIN_DIR = os.path.dirname(os.path.dirname(__file__))
     DATA_PATH = os.path.join(MAIN_DIR, "dataset_evaluation")
-    NUM_ITERATIONS = 15  # Iterations for standard technique
-    NUM_INTERMEDIATE_TARGETS = 5
+    NUM_ITERATIONS = 10  # Iterations for standard technique
+    NUM_INTERMEDIATE_TARGETS = 1
     PLOT = True
     
     # Define path for the model
-    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_sage-pine-63_best.pt")
+    CHECKPOINT_PATH = os.path.join(MAIN_DIR, "checkpoints/diffusion_serene-shadow-12_best.pt")
     
     # Load the model
     print("Loading Model...")
@@ -513,10 +513,10 @@ if __name__ == "__main__":
     print(f"Total samples (actions): {len(all_samples)}")
 
 
-    sample = all_samples[50]
+    sample = all_samples[80]
 
     # Run simulations for both models
-    print("Running simulation for Model 1...")
+    print("Running Standard simulation...")
     all_actions_1, all_shapes_1 = run(model, 
                                       dlo_params, 
                                       sample["dlo_0"], 
@@ -525,7 +525,7 @@ if __name__ == "__main__":
                                       num_iterations=NUM_ITERATIONS, 
                                       half_exec=False)
     
-    print("Running simulation for Model 2...")
+    print("Running simulation with intermediate targets...")
     all_actions_2, all_shapes_2, intermediate_targets = run_intermediate(model, 
                                                                          dlo_params, 
                                                                          sample["dlo_0"], 

@@ -264,7 +264,7 @@ if __name__ == "__main__":
     model_1 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
     
     print("Loading Model 2...")
-    model_2 = DiffusionInference(CHECKPOINT_PATH_1, device="cuda")
+    model_2 = DiffusionInference(CHECKPOINT_PATH_2, device="cuda")
 
     ################################
 
